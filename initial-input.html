@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>블럭 원가 관리 — 날짜 세트(그룹) + 일괄입력 + Override 데모</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --gray-100:#f6f7f9; --gray-200:#eceff3; --gray-300:#d9dee5; --gray-500:#8a94a6; --gray-700:#3e4653;
+    --blue:#2d7ff9; --green:#19a05e; --red:#e5524a; --soft:#eaf2fd; --hard:#fdecea; --active:#e9fbe9; --warn:#fff4d6;
+  }
+  body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:0;background:#fff;color:#111;}
+  header{padding:18px 20px;border-bottom:1px solid var(--gray-200);position:sticky;top:0;background:#fff;z-index:5}
+  h1{font-size:18px;margin:0 0 6px}
+  .filters{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  label{font-size:13px;color:var(--gray-700)}
+  select,input[type="date"],input[type="text"],input[type="number"]{
+    padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;background:#fff;font-size:13px
+  }
+  .builder{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .weekday{display:flex;gap:6px}
+  .weekday label{display:inline-flex;align-items:center;gap:4px;background:var(--gray-100);padding:4px 8px;border-radius:6px;border:1px solid var(--gray-200)}
+  .btn{padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;background:#fff;font-weight:600;cursor:pointer}
+  .btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .btn.ghost{background:#fff}
+  .btn.small{padding:4px 8px;font-size:12px}
+  .container{padding:18px 20px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border-bottom:1px solid var(--gray-200);padding:10px 8px;text-align:center;vertical-align:middle}
+  thead th{background:var(--gray-100);position:sticky;top:66px;z-index:4}
+  tbody tr.group-row{background:#fafbfc}
+  tbody tr.group-row td{font-weight:600}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid var(--gray-300);background:#fff}
+  .chip.hard{background:var(--hard);border-color:#f3c3be}
+  .chip.soft{background:var(--soft);border-color:#bfd4fb}
+  .chip.active{background:var(--active);border-color:#b7edc9}
+  .muted{color:var(--gray-500)}
+  .mono{font-variant-numeric:tabular-nums}
+  .fold{cursor:pointer;user-select:none}
+  .ovr{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--warn);border:1px dashed #e6b400;border-radius:6px;font-size:11px;color:#7a5a00}
+  .reset{cursor:pointer;font-size:11px;color:var(--blue);text-decoration:underline}
+  .right{text-align:right}
+  .left{text-align:left}
+  .grid-input{width:90px;text-align:right;padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px}
+  .log{font-size:12px;color:var(--gray-700)}
+  .hint{font-size:12px;color:var(--gray-500);margin-top:8px}
+  .row-note{color:var(--gray-500);font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>블럭 원가 관리 — 날짜 세트(그룹) 입력 데모</h1>
+  <div class="filters">
+    <label>Season
+      <select id="season">
+        <option>25W</option>
+      </select>
+    </label>
+    <label>노선
+      <select id="route">
+        <option>ICN–MNL</option>
+        <option>ICN–CEB</option>
+        <option>PUS–MNL</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="builder">
+    <strong>날짜 빌더:</strong>
+    <label>기간 <input type="date" id="from" /> ~ <input type="date" id="to" /></label>
+    <div class="weekday">
+      <label><input type="checkbox" value="1" checked/>월</label>
+      <label><input type="checkbox" value="2" />화</label>
+      <label><input type="checkbox" value="3" />수</label>
+      <label><input type="checkbox" value="4" />목</label>
+      <label><input type="checkbox" value="5" checked/>금</label>
+      <label><input type="checkbox" value="6" />토</label>
+      <label><input type="checkbox" value="0" checked/>일</label>
+    </div>
+    <label>패턴 <input type="text" id="pattern" value="3N5D" style="width:90px"/></label>
+    <button class="btn primary" id="makeGroup">그룹 생성</button>
+    <span class="hint">예: 2025-10-29 ~ 2025-12-18, 월/금/일 선택 → 그룹행과 날짜행 자동 생성</span>
+  </div>
+</header>
+
+<div class="container">
+  <table id="grid">
+    <thead>
+      <tr>
+        <th class="left">출발일 세트 / 개별 날짜</th>
+        <th>패턴</th>
+        <th>구분</th>
+        <th>좌석수</th>
+        <th>단가(₩)</th>
+        <th class="right">총액</th>
+        <th class="left">로그/상태</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <!-- 생성되는 영역 -->
+    </tbody>
+  </table>
+  <p class="hint">그룹행의 좌석/단가를 바꾸면 자식 날짜에 일괄 반영됩니다. 자식 날짜에서 값을 수정하면 <b>Override</b>로 표시되고, 이후 그룹 변경의 영향을 받지 않습니다. “↺ 재설정”을 누르면 그룹값을 다시 따릅니다.</p>
+</div>
+
+<script>
+/** 유틸 */
+const fmt = n => '₩' + (Number(n||0)).toLocaleString('ko-KR');
+const sum = arr => arr.reduce((a,b)=>a+Number(b||0),0);
+const dayNames=['일','월','화','수','목','금','토'];
+
+function datesByRangeAndWeekdays(fromStr,toStr,wds){
+  const out=[]; const from=new Date(fromStr); const to=new Date(toStr);
+  if(isNaN(from)||isNaN(to) || from>to) return out;
+  for(let d=new Date(from); d<=to; d.setDate(d.getDate()+1)){
+    const wd=d.getDay();
+    if(wds.has(wd)) out.push(new Date(d));
+  }
+  return out;
+}
+
+let groupSeq=1;
+
+/** DOM 생성 */
+const tbody=document.getElementById('tbody');
+
+function makeGroupRow({label, pattern, dates}){
+  const gid='G'+(groupSeq++);
+  // 그룹행
+  const tr=document.createElement('tr');
+  tr.className='group-row';
+  tr.dataset.groupId=gid;
+
+  tr.innerHTML=`
+    <td class="left fold">▼ <strong>${label}</strong> <span class="row-note muted">(${dates.length}일)</span></td>
+    <td>${pattern}</td>
+    <td>
+      <span class="chip hard">HARD</span> / <span class="chip soft">SOFT</span>
+    </td>
+    <td>
+      <div>H:<input class="grid-input" type="number" min="0" value="40" data-role="g-hard-seats"></div>
+      <div style="margin-top:4px">S:<input class="grid-input" type="number" min="0" value="20" data-role="g-soft-seats"></div>
+    </td>
+    <td>
+      <div>H:<input class="grid-input" type="number" min="0" value="250000" data-role="g-hard-price"></div>
+      <div style="margin-top:4px">S:<input class="grid-input" type="number" min="0" value="200000" data-role="g-soft-price"></div>
+    </td>
+    <td class="right mono" data-role="g-total">—</td>
+    <td class="left">
+      <button class="btn small" data-role="apply">그룹값 자식에 일괄적용</button>
+      <span class="muted">/ 접기</span>
+    </td>
+  `;
+  tbody.appendChild(tr);
+
+  // 날짜행들
+  dates.forEach((d,i)=>{
+    const dr=document.createElement('tr');
+    dr.dataset.groupId=gid;
+    dr.dataset.childRow='1';
+    const y=d.getFullYear(); const m=(d.getMonth()+1+'').padStart(2,'0'); const day=(d.getDate()+'').padStart(2,'0');
+    const wd=dayNames[d.getDay()];
+    const dateLabel=`${m}/${day}(${wd})`;
+
+    dr.innerHTML=`
+      <td class="left">${i===0?'<span class="muted">세부</span>':''} ${dateLabel}</td>
+      <td>${pattern}</td>
+      <td>
+        <div style="margin-bottom:6px"><span class="chip hard">HARD</span></div>
+        <div><span class="chip soft">SOFT</span></div>
+      </td>
+      <td>
+        <div style="margin-bottom:6px">
+          <input class="grid-input" type="number" min="0" data-role="c-hard-seats">
+          <span class="ovr" data-role="ovr-hard-seats" style="display:none">override <span class="reset" data-role="reset-hard-seats">↺ 재설정</span></span>
+        </div>
+        <div>
+          <input class="grid-input" type="number" min="0" data-role="c-soft-seats">
+          <span class="ovr" data-role="ovr-soft-seats" style="display:none">override <span class="reset" data-role="reset-soft-seats">↺ 재설정</span></span>
+        </div>
+      </td>
+      <td>
+        <div style="margin-bottom:6px">
+          <input class="grid-input" type="number" min="0" data-role="c-hard-price">
+          <span class="ovr" data-role="ovr-hard-price" style="display:none">override <span class="reset" data-role="reset-hard-price">↺ 재설정</span></span>
+        </div>
+        <div>
+          <input class="grid-input" type="number" min="0" data-role="c-soft-price">
+          <span class="ovr" data-role="ovr-soft-price" style="display:none">override <span class="reset" data-role="reset-soft-price">↺ 재설정</span></span>
+        </div>
+      </td>
+      <td class="right mono" data-role="c-total">—</td>
+      <td class="left log"><span class="muted">-</span></td>
+    `;
+    tbody.appendChild(dr);
+  });
+
+  // 초기 일괄적용 & 합계 업데이트
+  applyGroupToChildren(gid);
+  updateGroupTotal(gid);
+
+  // 이벤트: 그룹 일괄적용
+  tr.querySelector('[data-role="apply"]').addEventListener('click', ()=>{
+    applyGroupToChildren(gid, /*respectOverride*/ true);
+    updateGroupTotal(gid);
+  });
+
+  // 이벤트: 그룹 입력 변경 → 합계만 업데이트(override 아닌 자식은 자동 반영하려면 아래 true로 호출)
+  ['g-hard-seats','g-soft-seats','g-hard-price','g-soft-price'].forEach(r=>{
+    tr.querySelector(`[data-role="${r}"]`).addEventListener('input', ()=>{
+      applyGroupToChildren(gid, true); // override는 유지
+      updateGroupTotal(gid);
+    });
+  });
+
+  // 접기/펼치기
+  tr.querySelector('.fold').addEventListener('click', ()=>{
+    const open = tr.dataset.fold!=='closed';
+    [...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)]
+      .forEach(r=>r.style.display = open ? 'none' : '');
+    tr.dataset.fold = open ? 'closed' : 'open';
+    tr.querySelector('.fold').textContent = (open?'▶':'▼')+' '+tr.querySelector('.fold').textContent.slice(2);
+  });
+
+  // 자식행 이벤트: override 표시 & 합계 업데이트
+  [...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)].forEach(row=>{
+    const bind = (role, ovrRole, resetRole, gRole)=>{
+      const input=row.querySelector(`[data-role="${role}"]`);
+      const ovr=row.querySelector(`[data-role="${ovrRole}"]`);
+      const reset=row.querySelector(`[data-role="${resetRole}"]`);
+      input.addEventListener('input', ()=>{
+        const gv= Number(tr.querySelector(`[data-role="${gRole}"]`).value||0);
+        const cv= Number(input.value||0);
+        const isOvr = cv !== gv;
+        ovr.style.display = isOvr ? 'inline-flex' : 'none';
+        updateChildTotal(row);
+        updateGroupTotal(gid);
+      });
+      reset.addEventListener('click', ()=>{
+        input.value = tr.querySelector(`[data-role="${gRole}"]`).value;
+        ovr.style.display='none';
+        updateChildTotal(row);
+        updateGroupTotal(gid);
+      });
+    };
+    bind('c-hard-seats','ovr-hard-seats','reset-hard-seats','g-hard-seats');
+    bind('c-soft-seats','ovr-soft-seats','reset-soft-seats','g-soft-seats');
+    bind('c-hard-price','ovr-hard-price','reset-hard-price','g-hard-price');
+    bind('c-soft-price','ovr-soft-price','reset-soft-price','g-soft-price');
+    updateChildTotal(row);
+  });
+}
+
+function applyGroupToChildren(gid, respectOverride=true){
+  const tr=tbody.querySelector(`tr.group-row[data-group-id="${gid}"]`);
+  const ghSeats=tr.querySelector('[data-role="g-hard-seats"]').value;
+  const gsSeats=tr.querySelector('[data-role="g-soft-seats"]').value;
+  const ghPrice=tr.querySelector('[data-role="g-hard-price"]').value;
+  const gsPrice=tr.querySelector('[data-role="g-soft-price"]').value;
+
+  const children=[...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)];
+  children.forEach(row=>{
+    const setIf = (role, ovrRole, value)=>{
+      const ovr=row.querySelector(`[data-role="${ovrRole}"]`);
+      const input=row.querySelector(`[data-role="${role}"]`);
+      if(!(respectOverride && ovr.style.display==='inline-flex')){
+        input.value = value;
+        ovr.style.display='none';
+      }
+    };
+    setIf('c-hard-seats','ovr-hard-seats',ghSeats);
+    setIf('c-soft-seats','ovr-soft-seats',gsSeats);
+    setIf('c-hard-price','ovr-hard-price',ghPrice);
+    setIf('c-soft-price','ovr-soft-price',gsPrice);
+    updateChildTotal(row);
+  });
+}
+
+function updateChildTotal(row){
+  const hs=Number(row.querySelector('[data-role="c-hard-seats"]').value||0);
+  const hp=Number(row.querySelector('[data-role="c-hard-price"]').value||0);
+  const ss=Number(row.querySelector('[data-role="c-soft-seats"]').value||0);
+  const sp=Number(row.querySelector('[data-role="c-soft-price"]').value||0);
+  const total = hs*hp + ss*sp;
+  row.querySelector('[data-role="c-total"]').textContent = total? fmt(total): '—';
+}
+
+function updateGroupTotal(gid){
+  const rows=[...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)];
+  let total=0;
+  rows.forEach(r=>{
+    const hs=Number(r.querySelector('[data-role="c-hard-seats"]').value||0);
+    const hp=Number(r.querySelector('[data-role="c-hard-price"]').value||0);
+    const ss=Number(r.querySelector('[data-role="c-soft-seats"]').value||0);
+    const sp=Number(r.querySelector('[data-role="c-soft-price"]').value||0);
+    total += hs*hp + ss*sp;
+  });
+  const gtr=tbody.querySelector(`tr.group-row[data-group-id="${gid}"]`);
+  gtr.querySelector('[data-role="g-total"]').textContent = total? fmt(total): '—';
+}
+
+/** 날짜 빌더 버튼 */
+document.getElementById('makeGroup').addEventListener('click', ()=>{
+  const from=document.getElementById('from').value;
+  const to=document.getElementById('to').value;
+  const pattern=document.getElementById('pattern').value.trim() || '3N5D';
+  const wds=new Set([...document.querySelectorAll('.weekday input[type="checkbox"]:checked')].map(i=>Number(i.value)));
+  const list=datesByRangeAndWeekdays(from,to,wds);
+  if(list.length===0){ alert('선택한 기간/요일에 해당하는 날짜가 없습니다.'); return; }
+  const label = `${from} ~ ${to} · ` + [...wds].sort((a,b)=>a-b).map(i=>dayNames[i]).join('/');
+  makeGroupRow({label, pattern, dates:list});
+});
+
+/** 데모 기본값 */
+(function seed(){
+  const today=new Date();
+  const y=today.getFullYear();
+  const guessStart=`${y}-10-29`;
+  const guessEnd=`${y}-12-18`;
+  document.getElementById('from').value=guessStart;
+  document.getElementById('to').value=guessEnd;
+})();
+</script>
+</body>
+</html>

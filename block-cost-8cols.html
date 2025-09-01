@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>**블럭 원가 관리 데모**</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --gray-050:#fbfcfe; --gray-075:#f7f9fc; --gray-100:#f1f3f5; --gray-150:#edf1f6;
+    --gray-200:#e6eaf0; --gray-300:#d5dbe5; --text-weak:#6c7686; --blue:#2d7ff9;
+
+    /* BLOCK 컬러 */
+    --hard-bg:#fff5f3; --hard-hd:#ffdcd5; --hard-hd-strong:#ffcfc4;
+    --soft-bg:#f3f7ff; --soft-hd:#e6eeff; --soft-hd-strong:#d9e6ff;
+    --neutral-hd:#e9edf3;
+  }
+  *{box-sizing:border-box}
+  body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:0;color:#111;background:#fff}
+  header{padding:16px 20px;border-bottom:1px solid var(--gray-200);position:sticky;top:0;background:#fff;z-index:5}
+  h1{font-size:18px;margin:0 0 10px}
+  label{font-size:13px;color:#3e4653}
+  select,input[type="date"],input[type="text"],input[type="number"]{
+    padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;font-size:13px;background:#fff
+  }
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .weekday{display:flex;gap:6px}
+  .weekday label{display:inline-flex;align-items:center;gap:4px;background:var(--gray-100);padding:4px 8px;border-radius:6px;border:1px solid var(--gray-200);font-size:12px}
+  .btn{padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;background:#fff;font-weight:600;cursor:pointer}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.small{padding:4px 8px;font-size:12px}
+  .container{padding:16px 20px}
+
+  /* 표 */
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  colgroup col:nth-child(1){width:240px}  /* 출발일 더 넓게 */
+  colgroup col:nth-child(2){width:90px}   /* 패턴 */
+  colgroup col:nth-child(3){width:120px}  /* HARD 최초 */
+  colgroup col:nth-child(4){width:220px}  /* HARD 버전 */
+  colgroup col:nth-child(5){width:110px}  /* HARD 잔여 */
+  colgroup col:nth-child(6){width:120px}  /* SOFT 최초 */
+  colgroup col:nth-child(7){width:220px}  /* SOFT 버전 */
+  colgroup col:nth-child(8){width:110px}  /* SOFT 잔여 */
+
+  th,td{border-bottom:1px solid var(--gray-200);padding:10px 8px;vertical-align:top}
+  thead th{position:sticky;z-index:4;text-align:center}
+
+  /* 1단 헤더: 대분류 컬러 */
+  thead tr.head1 th{top:66px;background:#fff;font-weight:800}
+  thead tr.head1 th:first-child,
+  thead tr.head1 th:nth-child(2){background:var(--neutral-hd)}
+  thead tr.head1 th.hard-group{background:var(--hard-hd-strong)}
+  thead tr.head1 th.soft-group{background:var(--soft-hd-strong)}
+
+  /* 2단 헤더: 톤다운 */
+  thead tr.head2 th{top:98px;background:var(--gray-150);font-weight:700}
+  thead tr.head2 th.hard-group{background:var(--hard-hd)}
+  thead tr.head2 th.soft-group{background:var(--soft-hd)}
+
+  /* 그룹/날짜 시각 구분 */
+  tbody tr.group-row{
+    background:var(--gray-075);
+    font-weight:700;
+    border-top:2px solid var(--gray-200);
+    border-bottom:2px solid var(--gray-200);
+  }
+  /* 그룹행에서 HARD/SOFT 셀 강조 */
+  tbody tr.group-row td.hard-bg{
+    background:linear-gradient(0deg, #fff 0%, var(--hard-bg) 100%);
+    border-left:3px solid #ffb4a5;
+  }
+  tbody tr.group-row td.soft-bg{
+    background:linear-gradient(0deg, #fff 0%, var(--soft-bg) 100%);
+    border-left:3px solid #a9c2ff;
+  }
+  /* 날짜행은 평면 */
+  tbody tr[data-child-row="1"] td.hard-bg{background:var(--hard-bg)}
+  tbody tr[data-child-row="1"] td.soft-bg{background:var(--soft-bg)}
+
+  .left{text-align:left} .center{text-align:center} .right{text-align:right}
+  .mono{font-variant-numeric:tabular-nums}
+  .muted{color:var(--text-weak)}
+
+  .grid-input{width:90px;text-align:right;padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;background:#fff}
+  .seat-strong{font-weight:800;font-size:14px}
+  .seat-weak{font-weight:700}
+
+  .ver-list{display:flex;flex-direction:column;gap:6px}
+  .ver-line{
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    border:1px solid var(--gray-200);border-radius:8px;padding:6px 8px;background:#fff
+  }
+  .ver-line b{white-space:nowrap}
+  .price-input{width:110px}
+  .neg{color:#b00020;font-weight:800}
+
+  /* 접기 버튼 */
+  .fold-btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 8px;border-radius:8px;border:1px solid var(--gray-300);
+    background:#fff;cursor:pointer;font-weight:700
+  }
+  .fold-btn .caret{font-weight:900;width:12px;display:inline-block;text-align:center}
+  .fold-controls{margin-left:auto;display:flex;gap:8px}
+  .toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:8px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>블럭 원가 관리 데모 — 날짜 그룹 생성 + 가격 버전 관리</h1>
+
+  <div class="row">
+    <label>시즌
+      <select id="season">
+        <option>25-26W</option>
+        <option>26S</option>
+        <option>26-27W</option>
+      </select>
+    </label>
+    <label>노선
+      <select id="route">
+        <option value="ICN-MNL">ICN-MNL</option>
+        <option value="PUS-MNL">PUS-MNL</option>
+        <option value="ICN-CEB">ICN-CEB</option>
+      </select>
+    </label>
+    <label>편명
+      <select id="flight"></select>
+    </label>
+  </div>
+
+  <div class="row" style="margin-top:10px">
+    <strong>날짜 빌더:</strong>
+    <label>기간 <input type="date" id="from" /> ~ <input type="date" id="to" /></label>
+    <div class="weekday">
+      <label><input type="checkbox" value="ALL" id="wd-all" checked/>ALL</label>
+      <label><input type="checkbox" value="1"/>월</label>
+      <label><input type="checkbox" value="2"/>화</label>
+      <label><input type="checkbox" value="3"/>수</label>
+      <label><input type="checkbox" value="4"/>목</label>
+      <label><input type="checkbox" value="5"/>금</label>
+      <label><input type="checkbox" value="6"/>토</label>
+      <label><input type="checkbox" value="0"/>일</label>
+    </div>
+    <label>패턴
+      <select id="pattern">
+        <option>3N5D</option>
+        <option>3N4D</option>
+        <option>4N5D</option>
+      </select>
+    </label>
+    <button class="btn primary" id="makeGroup">그룹 생성</button>
+  </div>
+
+  <div class="toolbar">
+    <span class="muted">그룹을 만들어 아래 표에 추가하세요.</span>
+    <div class="fold-controls">
+      <button class="btn small" id="collapseAll">모두 접기</button>
+      <button class="btn small" id="expandAll">모두 펼치기</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <table id="grid">
+    <colgroup>
+      <col><col><col><col><col><col><col><col>
+    </colgroup>
+    <thead>
+      <!-- 1단 헤더 -->
+      <tr class="head1">
+        <th rowspan="2" class="left">출발일</th>
+        <th rowspan="2">패턴</th>
+        <th class="hard-group" colspan="3">HARD BLOCK</th>
+        <th class="soft-group" colspan="3">SOFT BLOCK</th>
+      </tr>
+      <!-- 2단 헤더 -->
+      <tr class="head2">
+        <th class="hard-group">최초좌석</th>
+        <th class="left hard-group">버전(판매/단가)</th>
+        <th class="hard-group">잔여</th>
+        <th class="soft-group">최초좌석</th>
+        <th class="left soft-group">버전(판매/단가)</th>
+        <th class="soft-group">잔여</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+/* ===== 상단 편명 옵션 ===== */
+const FLIGHTS = {
+  'ICN-MNL': ['PR401','PR403'],
+  'PUS-MNL': ['PR461','PR463'],
+  'ICN-CEB': ['PR487']
+};
+function fillFlights(){
+  const route = document.getElementById('route').value;
+  const sel = document.getElementById('flight');
+  const list = FLIGHTS[route] || [];
+  sel.innerHTML = list.map(f=>`<option>${f}</option>`).join('');
+}
+
+/* ===== 날짜 유틸 ===== */
+const dayNames=['일','월','화','수','목','금','토'];
+function datesByRangeAndWeekdays(fromStr,toStr,wdSet){
+  const out=[]; const from=new Date(fromStr); const to=new Date(toStr);
+  if(isNaN(from)||isNaN(to)||from>to) return out;
+  for(let d=new Date(from); d<=to; d.setDate(d.getDate()+1)){
+    if(wdSet==null || wdSet.has(d.getDay())) out.push(new Date(d));
+  }
+  return out;
+}
+function mmdd(d){ return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}(${dayNames[d.getDay()]})`; }
+
+/* ===== 상태 ===== */
+let groupSeq=1;
+const tbody=document.getElementById('tbody');
+/** 그룹별 버전: { gid: { hard:[{id,price}], soft:[...] } } */
+const versionsByGroup = Object.create(null);
+/** 날짜별 판매: { childId: { hard:{v1:n,...}, soft:{v1:n,...} } } */
+const salesByChild = Object.create(null);
+/** 날짜별 단가 override: { childId: { hard:{v1:price?,...}, soft:{v1:price?,...} } } */
+const priceOverrideByChild = Object.create(null);
+/** 접기 상태 저장(localStorage) */
+const FOLD_KEY = 'blockFoldState';
+let foldState = {};
+try { foldState = JSON.parse(localStorage.getItem(FOLD_KEY)||'{}') || {}; } catch(e){ foldState = {}; }
+function saveFold(){ localStorage.setItem(FOLD_KEY, JSON.stringify(foldState)); }
+
+/* ===== 그룹 접기/펼치기 ===== */
+function setGroupFold(gid, closed){
+  const childRows = [...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)];
+  childRows.forEach(r=> r.style.display = closed ? 'none' : '');
+  const gtr = tbody.querySelector(`tr.group-row[data-group-id="${gid}"]`);
+  if(!gtr) return;
+  const btn = gtr.querySelector('.fold-btn .caret');
+  if(btn) btn.textContent = closed ? '▶' : '▼';
+  foldState[gid] = closed ? 'closed' : 'open';
+  saveFold();
+}
+function toggleGroupFold(gid){
+  const current = foldState[gid] === 'closed';
+  setGroupFold(gid, !current ? true : false);
+}
+function collapseAll(){
+  Object.keys(versionsByGroup).forEach(gid=> setGroupFold(gid,true));
+}
+function expandAll(){
+  Object.keys(versionsByGroup).forEach(gid=> setGroupFold(gid,false));
+}
+
+/* ===== 그룹 생성 ===== */
+function makeGroupRow({label, pattern, dates}){
+  const gid='G'+(groupSeq++);
+  versionsByGroup[gid] = {hard:[], soft:[]};
+
+  // 그룹 요약 행
+  const gtr=document.createElement('tr');
+  gtr.className='group-row';
+  gtr.dataset.groupId=gid;
+  gtr.innerHTML=`
+    <td class="left" colspan="2">
+      <button type="button" class="fold-btn" data-role="fold" aria-expanded="true">
+        <span class="caret">▼</span> <span class="txt"><b>${label}</b></span>
+      </button>
+      <span class="muted"> · ${pattern} · ${dates.length}회차</span>
+    </td>
+    <td class="hard-bg"><input class="grid-input seat-strong" type="number" min="0" value="40" data-role="g-hard-seats"></td>
+    <td class="left hard-bg">
+      <div class="ver-list" data-role="g-hard-verlist"></div>
+      <div style="margin-top:6px">
+        <input class="grid-input" type="number" min="0" value="250000" data-role="g-hard-newprice">
+        <button class="btn small" data-role="g-hard-add">+버전추가</button>
+      </div>
+    </td>
+    <td class="center hard-bg seat-weak">—</td>
+    <td class="soft-bg"><input class="grid-input seat-strong" type="number" min="0" value="20" data-role="g-soft-seats"></td>
+    <td class="left soft-bg">
+      <div class="ver-list" data-role="g-soft-verlist"></div>
+      <div style="margin-top:6px">
+        <input class="grid-input" type="number" min="0" value="200000" data-role="g-soft-newprice">
+        <button class="btn small" data-role="g-soft-add">+버전추가</button>
+      </div>
+    </td>
+    <td class="center soft-bg seat-weak">—</td>
+  `;
+  tbody.appendChild(gtr);
+
+  // 날짜 행
+  dates.forEach((d)=>{
+    const childId=`${gid}-${d.toISOString().slice(0,10)}`;
+    salesByChild[childId]={hard:{}, soft:{}};
+    priceOverrideByChild[childId]={hard:{}, soft:{}};
+
+    const tr=document.createElement('tr');
+    tr.dataset.groupId=gid; tr.dataset.childRow='1'; tr.dataset.childId=childId;
+    tr.innerHTML=`
+      <td class="left">${mmdd(d)}</td>
+      <td class="center">${pattern}</td>
+      <td class="hard-bg"><input class="grid-input seat-strong" type="number" min="0" data-role="c-hard-seats"></td>
+      <td class="left hard-bg"><div class="ver-list" data-role="c-hard-verlist"></div></td>
+      <td class="center hard-bg seat-weak" data-role="c-hard-remain">0</td>
+      <td class="soft-bg"><input class="grid-input seat-strong" type="number" min="0" data-role="c-soft-seats"></td>
+      <td class="left soft-bg"><div class="ver-list" data-role="c-soft-verlist"></div></td>
+      <td class="center soft-bg seat-weak" data-role="c-soft-remain">0</td>
+    `;
+    tbody.appendChild(tr);
+
+    // 초기 좌석 복사
+    tr.querySelector('[data-role="c-hard-seats"]').value = gtr.querySelector('[data-role="g-hard-seats"]').value;
+    tr.querySelector('[data-role="c-soft-seats"]').value = gtr.querySelector('[data-role="g-soft-seats"]').value;
+
+    // 좌석 수정 → 잔여 갱신
+    tr.querySelector('[data-role="c-hard-seats"]').addEventListener('input', ()=>renderChildVersions(gid,tr));
+    tr.querySelector('[data-role="c-soft-seats"]').addEventListener('input', ()=>renderChildVersions(gid,tr));
+  });
+
+  // v1 자동 생성
+  addVersion(gid,'hard',Number(gtr.querySelector('[data-role="g-hard-newprice"]').value||0));
+  addVersion(gid,'soft',Number(gtr.querySelector('[data-role="g-soft-newprice"]').value||0));
+  renderGroupVersionList(gid);
+  rerenderChildren(gid);
+
+  // 그룹 좌석 변경 → 자식 좌석 일괄 반영
+  ['g-hard-seats','g-soft-seats'].forEach(role=>{
+    gtr.querySelector(`[data-role="${role}"]`).addEventListener('input', ()=>{
+      [...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)].forEach(r=>{
+        if(role==='g-hard-seats') r.querySelector('[data-role="c-hard-seats"]').value = gtr.querySelector('[data-role="g-hard-seats"]').value;
+        if(role==='g-soft-seats') r.querySelector('[data-role="c-soft-seats"]').value = gtr.querySelector('[data-role="g-soft-seats"]').value;
+        renderChildVersions(gid,r);
+      });
+    });
+  });
+
+  // 버전 추가
+  gtr.querySelector('[data-role="g-hard-add"]').addEventListener('click', ()=>{
+    addVersion(gid,'hard',Number(gtr.querySelector('[data-role="g-hard-newprice"]').value||0));
+    renderGroupVersionList(gid); rerenderChildren(gid);
+  });
+  gtr.querySelector('[data-role="g-soft-add"]').addEventListener('click', ()=>{
+    addVersion(gid,'soft',Number(gtr.querySelector('[data-role="g-soft-newprice"]').value||0));
+    renderGroupVersionList(gid); rerenderChildren(gid);
+  });
+
+  // 접기/펼치기 버튼
+  gtr.querySelector('[data-role="fold"]').addEventListener('click', ()=>{
+    toggleGroupFold(gid);
+  });
+
+  // 저장된 접기 상태 적용 (기본 open)
+  const closed = foldState[gid] === 'closed';
+  setGroupFold(gid, closed);
+}
+
+/* ===== 버전 저장/렌더 ===== */
+function addVersion(gid,type,price){
+  const list=versionsByGroup[gid][type];
+  const id='v'+(list.length+1);
+  list.push({id, price:Number(price||0)});
+}
+function renderGroupVersionList(gid){
+  const gtr=tbody.querySelector(`tr.group-row[data-group-id="${gid}"]`);
+  const hv=gtr.querySelector('[data-role="g-hard-verlist"]');
+  const sv=gtr.querySelector('[data-role="g-soft-verlist"]');
+  hv.innerHTML = versionsByGroup[gid].hard.map(v=>`
+    <div class="ver-line"><b>${v.id}</b><span class="muted">단가</span><b class="mono">₩${v.price.toLocaleString()}</b></div>
+  `).join('');
+  sv.innerHTML = versionsByGroup[gid].soft.map(v=>`
+    <div class="ver-line"><b>${v.id}</b><span class="muted">단가</span><b class="mono">₩${v.price.toLocaleString()}</b></div>
+  `).join('');
+}
+function rerenderChildren(gid){
+  [...tbody.querySelectorAll(`tr[data-group-id="${gid}"][data-child-row="1"]`)].forEach(r=>renderChildVersions(gid,r));
+}
+
+/* ===== 날짜행: 버전별 판매 + 날짜별 단가 조정 + 잔여 ===== */
+function renderChildVersions(gid, row){
+  const childId=row.dataset.childId;
+  salesByChild[childId] = salesByChild[childId] || {hard:{}, soft:{}};
+  priceOverrideByChild[childId] = priceOverrideByChild[childId] || {hard:{}, soft:{}};
+
+  // HARD
+  const hardSeats = Number(row.querySelector('[data-role="c-hard-seats"]').value||0);
+  const hWrap=row.querySelector('[data-role="c-hard-verlist"]');
+  hWrap.innerHTML='';
+  let hSoldSum=0;
+  versionsByGroup[gid].hard.forEach(v=>{
+    const sold = Number(salesByChild[childId].hard[v.id]||0);
+    hSoldSum += sold;
+    const override = priceOverrideByChild[childId].hard[v.id];
+
+    const line=document.createElement('div');
+    line.className='ver-line';
+    line.innerHTML=`
+      <b>${v.id}</b>
+      <span class="muted">판매</span>
+      <input class="grid-input" type="number" min="0" value="${sold}">
+      <span class="muted">단가</span>
+      <input class="grid-input price-input mono" type="number" min="0" ${override==null?`placeholder="${v.price}" value=""`:`value="${override}"`}>
+    `;
+    const [soldInput, priceInput] = line.querySelectorAll('input');
+    soldInput.addEventListener('input', ()=>{
+      salesByChild[childId].hard[v.id]=Number(soldInput.value||0);
+      renderChildVersions(gid,row);
+    });
+    priceInput.addEventListener('input', ()=>{
+      const val = priceInput.value;
+      priceOverrideByChild[childId].hard[v.id] = (val===''? undefined : Number(val||0));
+    });
+    hWrap.appendChild(line);
+  });
+  const hRemain = hardSeats - hSoldSum;
+  const hRemainEl = row.querySelector('[data-role="c-hard-remain"]');
+  hRemainEl.textContent = hRemain;
+  hRemainEl.classList.toggle('neg', hRemain<0);
+
+  // SOFT
+  const softSeats = Number(row.querySelector('[data-role="c-soft-seats"]').value||0);
+  const sWrap=row.querySelector('[data-role="c-soft-verlist"]');
+  sWrap.innerHTML='';
+  let sSoldSum=0;
+  versionsByGroup[gid].soft.forEach(v=>{
+    const sold = Number(salesByChild[childId].soft[v.id]||0);
+    sSoldSum += sold;
+    const override = priceOverrideByChild[childId].soft[v.id];
+
+    const line=document.createElement('div');
+    line.className='ver-line';
+    line.innerHTML=`
+      <b>${v.id}</b>
+      <span class="muted">판매</span>
+      <input class="grid-input" type="number" min="0" value="${sold}">
+      <span class="muted">단가</span>
+      <input class="grid-input price-input mono" type="number" min="0" ${override==null?`placeholder="${v.price}" value=""`:`value="${override}"`}>
+    `;
+    const [soldInput, priceInput] = line.querySelectorAll('input');
+    soldInput.addEventListener('input', ()=>{
+      salesByChild[childId].soft[v.id]=Number(soldInput.value||0);
+      renderChildVersions(gid,row);
+    });
+    priceInput.addEventListener('input', ()=>{
+      const val = priceInput.value;
+      priceOverrideByChild[childId].soft[v.id] = (val===''? undefined : Number(val||0));
+    });
+    sWrap.appendChild(line);
+  });
+  const sRemain = softSeats - sSoldSum;
+  const sRemainEl = row.querySelector('[data-role="c-soft-remain"]');
+  sRemainEl.textContent = sRemain;
+  sRemainEl.classList.toggle('neg', sRemain<0);
+}
+
+/* ===== 요일 체크박스 ===== */
+function getSelectedWeekdays(){
+  const all=document.getElementById('wd-all');
+  const boxes=[...document.querySelectorAll('.weekday input[type="checkbox"]')].filter(b=>b.value!=='ALL');
+  if(all.checked){ boxes.forEach(b=>b.checked=true); }
+  return new Set(boxes.filter(b=>b.checked).map(b=>Number(b.value)));
+}
+function bindWeekdayAll(){
+  const all=document.getElementById('wd-all');
+  const boxes=[...document.querySelectorAll('.weekday input[type="checkbox"]')].filter(b=>b.value!=='ALL');
+  all.addEventListener('change', ()=> boxes.forEach(b=>b.checked = all.checked));
+  boxes.forEach(b=> b.addEventListener('change', ()=>{ all.checked = boxes.every(x=>x.checked); }));
+}
+
+/* ===== 날짜 빌더 ===== */
+document.getElementById('makeGroup').addEventListener('click', ()=>{
+  const from=document.getElementById('from').value;
+  const to=document.getElementById('to').value;
+  const wds=getSelectedWeekdays();
+  const list=datesByRangeAndWeekdays(from,to,wds);
+  if(list.length===0){ alert('선택한 기간/요일에 해당하는 날짜가 없습니다.'); return; }
+  const pattern=document.getElementById('pattern').value;
+  const route=document.getElementById('route').value;
+  const flight=document.getElementById('flight').value||'';
+  makeGroupRow({
+    label: `${route} ${flight} · ${from} ~ ${to}`,
+    pattern, dates:list
+  });
+});
+
+/* ===== 초기화 & 글로벌 접기 버튼 ===== */
+document.getElementById('collapseAll').addEventListener('click', collapseAll);
+document.getElementById('expandAll').addEventListener('click', expandAll);
+
+(function init(){
+  bindWeekdayAll();
+  fillFlights();
+  const y=(new Date()).getFullYear();
+  document.getElementById('from').value=`${y}-10-29`;
+  document.getElementById('to').value=`${y}-12-18`;
+})();
+</script>
+</body>
+</html>
